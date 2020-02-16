@@ -2,6 +2,7 @@
 #omit observations with NAs
 combined_no_na <- combined_raw %>%
   na.omit()
+print(paste("Deleted rows containing at least one NA:", nrow(combined_raw) - nrow(combined_no_na)))
 
 split_date <- "2019-12-01"
 train <- combined_no_na %>% 
@@ -32,7 +33,7 @@ jannowitz_rec_lm <- recipe(jannowitz_n ~ ., data = train) %>%
   step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>% 
-  step_dummy(weekday, hour, month, week) %>%
+  step_dummy(weekday, hour, month, week, one_hot = TRUE) %>%
   step_normalize(all_predictors()) %>% 
   prep()
 
