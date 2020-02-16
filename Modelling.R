@@ -1,3 +1,5 @@
+load(file = "after_preprocessing.RData")
+
 # splitting the data ------------------------------------------------------
 #omit observations with NAs
 combined_no_na <- combined_raw %>%
@@ -28,13 +30,13 @@ cntrl <-  control_grid(verbose = TRUE)
 ##### LM ######
 #setup recipe with normalization of numerical variables
 jannowitz_rec_lm <- recipe(jannowitz_n ~ ., data = train) %>%
-  step_rm(date) %>% 
+  step_pca(starts_with("lag"), num_comp = 1) %>%
   step_num2factor(weekday, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) %>%
   step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>% 
   step_dummy(weekday, hour, month, week, one_hot = TRUE) %>%
-  step_normalize(all_predictors()) %>% 
+  step_normalize(all_predictors()) %>%
   prep()
 
 bake(jannowitz_rec_lm, train) #bake recipe to see if it works
@@ -67,13 +69,13 @@ autoplot(initial_lm)
 # knn ---------------------------------------------------------------------
 #setup recipe with normalization of numerical variables
 jannowitz_rec_knn <- recipe(jannowitz_n ~ ., data = train) %>%
-  step_rm(date) %>% 
-  #step_log(jannowitz_n, lag_last_month, lag_last_week) %>% 
+  step_rm(date) %>%
+  step_pca(starts_with("lag"), num_comp = 1) %>%
   step_num2factor(weekday, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) %>%
   step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>% 
-  step_dummy(weekday, hour, month, week) %>%
+  step_dummy(weekday, hour, month, week, one_hot = T) %>%
   step_normalize(all_predictors()) %>% 
   prep()
 
@@ -81,7 +83,7 @@ bake(jannowitz_rec_lm, train) #bake recipe to see if it works
 
 #knn model with kknn
 knn_mod <- nearest_neighbor(mode = "regression",
-                            neighbors = tune()) %>% 
+                            neighbors = 5) %>% 
   set_engine("kknn")
 
 #define workflow
@@ -91,10 +93,12 @@ knn_wflow <- workflow() %>%
 
 #run model with resampling
 set.seed(456321)
-library(doParallel)
-cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
-registerDoParallel(cl)
+#library(doParallel)
+#cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
+#registerDoParallel(cl)
 initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = 10)
+#registerDoSEQ()
+#showConnections()
 
 #show best
 initial_knn %>% 

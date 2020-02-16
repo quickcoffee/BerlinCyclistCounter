@@ -189,3 +189,5 @@ combined_raw %>%
 cor(combined_raw %>% select(-date), use = "complete.obs") %>% 
   corrplot::corrplot()
 
+save.image(file = "after_preprocessing.RData")
+
