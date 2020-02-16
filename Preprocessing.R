@@ -28,7 +28,7 @@ all_counts <- bind_rows(sheets_list) %>%
   mutate(weekday = wday(date, label = TRUE, abbr = TRUE))
 
 # background maps
-ggmap::register_google(key = "AIzaSyDNncjwcg8vxRIzMXZzP1hCi2rDvzgclrQ") #Maps API key
+ggmap::register_google(key = "XXX") #Maps API key
 
 #maps map
 berlin_map <- get_googlemap(center = c(lon = 13.4, lat = 52.5),
