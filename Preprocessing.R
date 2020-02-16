@@ -155,8 +155,6 @@ combined_raw %>%
        y = "Average Count of Cyclists",
        fill = "Brückentag?")+
   scale_y_continuous(labels = comma)
-  
-
 
 #cyclist per year at jannowitz brücke
 combined_raw %>%

@@ -25,7 +25,7 @@ train_folds %>%
 # Model Training ----------------------------------------------------------
 
 #define control_grid for all models
-cntrl <-  control_grid(verbose = TRUE)
+cntrl <-  control_grid(verbose = TRUE, save_pred = TRUE)
 
 ##### LM ######
 #setup recipe with normalization of numerical variables
@@ -36,12 +36,12 @@ jannowitz_rec_lm <- recipe(jannowitz_n ~ ., data = train) %>%
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>% 
   step_dummy(weekday, hour, month, week, one_hot = TRUE) %>%
-  step_normalize(all_predictors()) %>%
+  step_normalize(all_numeric(), -jannowitz_n) %>%
   prep()
 
 bake(jannowitz_rec_lm, train) #bake recipe to see if it works
 
-#lm model with glmnet
+#lm model - baseline
 lm_mod <- linear_reg(mode = "regression") %>% 
   set_engine("lm")
 
@@ -58,13 +58,6 @@ initial_lm <- fit_resamples(lm_wflow, resamples = train_folds, control = cntrl)
 initial_lm %>% 
   show_best(metric = "rmse", maximize = FALSE)
 
-initial_lm %>% 
-  unnest(.notes) %>% 
-  select(.notes)
-
-autoplot(initial_lm)
-
-
 
 # knn ---------------------------------------------------------------------
 #setup recipe with normalization of numerical variables
@@ -79,11 +72,11 @@ jannowitz_rec_knn <- recipe(jannowitz_n ~ ., data = train) %>%
   step_normalize(all_predictors()) %>% 
   prep()
 
-bake(jannowitz_rec_lm, train) #bake recipe to see if it works
+bake(jannowitz_rec_knn, train) #bake recipe to see if it works
 
 #knn model with kknn
 knn_mod <- nearest_neighbor(mode = "regression",
-                            neighbors = 5) %>% 
+                            neighbors = tune()) %>%
   set_engine("kknn")
 
 #define workflow
