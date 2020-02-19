@@ -13,10 +13,11 @@ test <- combined_no_na %>%
   filter(as.Date(date) > split_date)
 
 train_folds <- rolling_origin(train,
-                              initial = 365*24*3,
-                              assess = 24*7*4,
+                              initial = 24*365*3,
+                              assess = 24*7,
                               cumulative = F,
-                              skip = 24*7*4*4)
+                              skip = 24*7*9)
+
 
 #number of folds
 train_folds %>% 
@@ -63,54 +64,44 @@ initial_lm %>%
   collect_metrics(summarize = T)
 
 
-# knn ---------------------------------------------------------------------
+# MARS --------------------------------------------------------------------
 #setup recipe with normalization of numerical variables
-jannowitz_rec_knn <- recipe(jannowitz_n ~ ., data = train) %>%
-  step_rm(date) %>%
+jannowitz_rec_mars <- recipe(jannowitz_n ~ ., data = train) %>%
   step_pca(starts_with("lag"), num_comp = 1) %>%
   step_num2factor(weekday, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) %>%
   step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>% 
-  step_dummy(weekday, hour, month, week, one_hot = T) %>%
-  step_normalize(all_numeric(), -all_outcomes()) %>% 
+  step_dummy(all_nominal(), one_hot = TRUE) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
   prep()
 
-bake(jannowitz_rec_knn, train) #bake recipe to see if it works
+bake(jannowitz_rec_mars, train) #bake recipe to see if it works
 
-#knn model with kknn
-knn_mod <- nearest_neighbor(mode = "regression",
-                            neighbors = tune(),
-                            weight_func = tune()) %>%
-  set_engine("kknn")
+#mars model
+mars_mod <- mars(mode = "regression", num_terms = tune(), prod_degree = tune()) %>% 
+  set_engine("earth")
 
 #define workflow
-knn_wflow <- workflow() %>%
-  add_recipe(jannowitz_rec_knn) %>%
-  add_model(knn_mod)
+mars_wflow <- workflow() %>%
+  add_recipe(jannowitz_rec_mars) %>%
+  add_model(mars_mod)
 
 #run model with resampling
 set.seed(456321)
 library(doParallel)
 cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
 registerDoParallel(cl)
-initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = 20)
-
-
-#show best
-initial_knn %>% 
-  show_best(metric = "rmse", maximize = FALSE)
-
-autoplot(initial_knn)
+initial_mars <- fit_resamples(mars_wflow, resamples = train_folds, control = 20)
 
 #show performance across resamples
-initial_knn %>% 
+initial_mars %>% 
   collect_metrics(summarize = F)
 #show summarized performance across resamples
-initial_knn %>% 
+initial_mars %>% 
   collect_metrics(summarize = T)
 
-
+saveRDS(initial_mars, file = "mars.rds")
 # random forest -----------------------------------------------------------
 
 #setup recipe with normalization of numerical variables
@@ -123,7 +114,7 @@ jannowitz_rec_rf <- recipe(jannowitz_n ~ ., data = train) %>%
   prep()
 
 bake(jannowitz_rec_rf, train) #bake recipe to see if it works
-#xgboost
+#rf model
 rf_mod <- rand_forest(mode = "regression", trees = tune(), mtry = tune(), min_n = tune()) %>% 
   set_engine(engine = "ranger")
 
@@ -131,24 +122,18 @@ rf_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_rf) %>%
   add_model(rf_mod)
 
-
-
-initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 30, control = cntrl)
+set.seed(456321)
+initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 20, control = cntrl)
 #show best
 initial_rf %>% 
   show_best(metric = "rmse", maximize = FALSE)
 
 autoplot(initial_rf)
 
-view(initial_rf %>% 
-       unnest(.notes) %>% 
-       count(.notes))
-
 initial_rf %>% 
-  select(.notes) %>% 
-  unlist()
+  collect_metrics(summarize = F)
 
-
+saveRDS(initial_rf, file = "rf.rds")
 # xgboost -----------------------------------------------------------------
 
 #setup recipe with normalization of numerical variables
@@ -158,6 +143,7 @@ jannowitz_rec_xgb <- recipe(jannowitz_n ~ ., data = train) %>%
   step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>%
+  step_dummy(all_nominal(), one_hot = T) %>% 
   prep()
 
 bake(jannowitz_rec_xgb, train) #bake recipe to see if it works
@@ -172,6 +158,8 @@ xgb_wflow <- workflow() %>%
 
 
 initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = 30, control = cntrl)
+
+
 #show best
 initial_xgb %>% 
   show_best(metric = "rmse", maximize = FALSE)
@@ -179,7 +167,7 @@ initial_xgb %>%
 autoplot(initial_xgb)
 
 
-save.image(file = "after_training.RData")
+saveRDS(initial_xgb, file = "xgb.rds")
 
 
 
