@@ -13,10 +13,11 @@ test <- combined_no_na %>%
   filter(as.Date(date) > split_date)
 
 train_folds <- rolling_origin(train,
-                              initial = 365*24*3,
-                              assess = 24*7*4,
+                              initial = 24*365*3,
+                              assess = 24*7,
                               cumulative = F,
-                              skip = 24*7*4*4)
+                              skip = 24*7*9)
+
 
 #number of folds
 train_folds %>% 
@@ -80,8 +81,7 @@ bake(jannowitz_rec_knn, train) #bake recipe to see if it works
 
 #knn model with kknn
 knn_mod <- nearest_neighbor(mode = "regression",
-                            neighbors = tune(),
-                            weight_func = tune()) %>%
+                            neighbors = tune()) %>%
   set_engine("kknn")
 
 #define workflow
@@ -89,12 +89,15 @@ knn_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_knn) %>%
   add_model(knn_mod)
 
+#define parameter grid
+knn_grid <- grid_regular(neighbors() %>% range_set(c(2,21)), levels = c(20))
+
 #run model with resampling
 set.seed(456321)
 library(doParallel)
 cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
 registerDoParallel(cl)
-initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = 20)
+initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = knn_grid)
 
 
 #show best
@@ -132,22 +135,15 @@ rf_wflow <- workflow() %>%
   add_model(rf_mod)
 
 
-
-initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 30, control = cntrl)
+initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 20, control = cntrl)
 #show best
 initial_rf %>% 
   show_best(metric = "rmse", maximize = FALSE)
 
 autoplot(initial_rf)
 
-view(initial_rf %>% 
-       unnest(.notes) %>% 
-       count(.notes))
-
 initial_rf %>% 
-  select(.notes) %>% 
-  unlist()
-
+  collect_metrics(summarize = F)
 
 # xgboost -----------------------------------------------------------------
 
@@ -158,6 +154,7 @@ jannowitz_rec_xgb <- recipe(jannowitz_n ~ ., data = train) %>%
   step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
   step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
   step_num2factor(week, levels = as.character(1:53)) %>%
+  step_dummy(all_nominal(), one_hot = T) %>% 
   prep()
 
 bake(jannowitz_rec_xgb, train) #bake recipe to see if it works
@@ -172,6 +169,11 @@ xgb_wflow <- workflow() %>%
 
 
 initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = 30, control = cntrl)
+
+table(initial_xgb %>% 
+  unnest(.notes) %>% 
+    select(.notes))
+
 #show best
 initial_xgb %>% 
   show_best(metric = "rmse", maximize = FALSE)
