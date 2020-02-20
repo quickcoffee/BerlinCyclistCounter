@@ -1,3 +1,4 @@
+pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel)
 load(file = "after_preprocessing.RData")
 
 # splitting the data ------------------------------------------------------
@@ -96,7 +97,8 @@ set.seed(456321)
 library(doParallel)
 cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
 registerDoParallel(cl)
-initial_mars <- fit_resamples(mars_wflow, resamples = train_folds, control = 20)
+
+initial_mars <- tune_grid(mars_wflow, resamples = train_folds, control = cntrl, grid = 20)
 
 #show performance across resamples
 initial_mars %>% 
@@ -104,6 +106,10 @@ initial_mars %>%
 #show summarized performance across resamples
 initial_mars %>% 
   collect_metrics(summarize = T)
+
+#show best
+initial_mars %>% 
+  show_best(metric = "rmse", maximize = FALSE)
 
 saveRDS(initial_mars, file = "mars.rds")
 # random forest -----------------------------------------------------------
