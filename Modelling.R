@@ -19,6 +19,12 @@ train_folds <- rolling_origin(train,
                               cumulative = F,
                               skip = 24*7*9)
 
+try_folds <- rolling_origin(test,
+                              initial = 24*21,
+                              assess = 24*1,
+                              cumulative = F,
+                              skip = 24*7)
+
 
 #number of folds
 train_folds %>% 
@@ -28,7 +34,7 @@ train_folds %>%
 # Model Training ----------------------------------------------------------
 
 #define control_grid for all models
-cntrl <-  control_grid(verbose = TRUE, save_pred = TRUE, allow_par = TRUE)
+cntrl <-  control_grid(verbose = TRUE, save_pred = FALSE, allow_par = TRUE)
 
 ##### LM ######
 #setup recipe with normalization of numerical variables
@@ -161,16 +167,27 @@ jannowitz_rec_xgb <- recipe(jannowitz_n ~ ., data = train) %>%
 
 bake(jannowitz_rec_xgb, train) #bake recipe to see if it works
 #xgboost
-xgb_mod <- boost_tree(mode = "regression", trees = tune(), tree_depth = tune(), mtry = tune(), learn_rate = tune()) %>% 
+xgb_mod <- boost_tree(mode = "regression",
+                      trees = tune(),
+                      min_n = tune(),
+                      tree_depth = tune(), 
+                      learn_rate = tune(),
+                      loss_reduction = tune()) %>% 
   set_engine("xgboost")
 
 xgb_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_xgb) %>%
   add_model(xgb_mod)
 
+set.seed(12345)
+xgb_grid = grid_max_entropy(trees(range = c(1,1500)),
+                 min_n(),
+                 tree_depth(),
+                 learn_rate(),
+                 loss_reduction(),
+                 size = 20)
 
-
-initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = 30, control = cntrl)
+initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = xgb_grid, control = cntrl)
 
 #show best
 initial_xgb %>% 
