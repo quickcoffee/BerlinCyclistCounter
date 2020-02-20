@@ -83,9 +83,11 @@ jannowitz_rec_mars <- recipe(jannowitz_n ~ ., data = train) %>%
 
 bake(jannowitz_rec_mars, train) #bake recipe to see if it works
 
+
 #mars model
 mars_mod <- mars(mode = "regression", num_terms = tune(), prod_degree = tune()) %>% 
   set_engine("earth")
+
 
 #define workflow
 mars_wflow <- workflow() %>%
@@ -132,6 +134,7 @@ rf_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_rf) %>%
   add_model(rf_mod)
 
+
 set.seed(456321)
 initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 20, control = cntrl)
 #show best
@@ -168,7 +171,6 @@ xgb_wflow <- workflow() %>%
 
 
 initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = 30, control = cntrl)
-
 
 #show best
 initial_xgb %>% 
