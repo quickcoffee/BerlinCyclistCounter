@@ -78,21 +78,42 @@ jannowitz_rec_mars <- recipe(jannowitz_n ~ ., data = train) %>%
 
 bake(jannowitz_rec_mars, train) #bake recipe to see if it works
 
+<<<<<<< HEAD
 #mars model
 mars_mod <- mars(mode = "regression", num_terms = tune(), prod_degree = tune()) %>% 
   set_engine("earth")
+=======
+#knn model with kknn
+knn_mod <- nearest_neighbor(mode = "regression",
+                            neighbors = tune()) %>%
+  set_engine("kknn")
+>>>>>>> 78b46e1514626106d3d1564451ea75a2b9be6eb5
 
 #define workflow
 mars_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_mars) %>%
   add_model(mars_mod)
 
+#define parameter grid
+knn_grid <- grid_regular(neighbors() %>% range_set(c(2,21)), levels = c(20))
+
 #run model with resampling
 set.seed(456321)
 library(doParallel)
 cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
 registerDoParallel(cl)
+<<<<<<< HEAD
 initial_mars <- fit_resamples(mars_wflow, resamples = train_folds, control = 20)
+=======
+initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = knn_grid)
+
+
+#show best
+initial_knn %>% 
+  show_best(metric = "rmse", maximize = FALSE)
+
+autoplot(initial_knn)
+>>>>>>> 78b46e1514626106d3d1564451ea75a2b9be6eb5
 
 #show performance across resamples
 initial_mars %>% 
@@ -122,7 +143,11 @@ rf_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_rf) %>%
   add_model(rf_mod)
 
+<<<<<<< HEAD
 set.seed(456321)
+=======
+
+>>>>>>> 78b46e1514626106d3d1564451ea75a2b9be6eb5
 initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 20, control = cntrl)
 #show best
 initial_rf %>% 
@@ -159,6 +184,12 @@ xgb_wflow <- workflow() %>%
 
 initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = 30, control = cntrl)
 
+<<<<<<< HEAD
+=======
+table(initial_xgb %>% 
+  unnest(.notes) %>% 
+    select(.notes))
+>>>>>>> 78b46e1514626106d3d1564451ea75a2b9be6eb5
 
 #show best
 initial_xgb %>% 
