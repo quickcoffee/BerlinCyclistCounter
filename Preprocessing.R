@@ -80,13 +80,16 @@ weather_clouds <- load_format_weather("weather/data_N_MN008.csv", "cloud_coverag
 weather_precipitation <- load_format_weather("weather/data_R1_MN008.csv", "precipitation")
 #humidity
 weather_humidity <- load_format_weather("weather/data_RF_TU_MN009.csv", "humidity")
+#temperature
+weather_temperature <- load_format_weather("weather/data_TT_TU_MN009.csv", "temperature")
 
 #combine everything
 combined_raw <- bike_count_raw %>%
   left_join(weather_wind, by = c("date"))%>%
   left_join(weather_clouds, by = c("date"))%>%
   left_join(weather_precipitation, by = c("date"))%>%
-  left_join(weather_humidity, by = c("date"))
+  left_join(weather_humidity, by = c("date")) %>% 
+  left_join(weather_temperature, by = c("date"))
 
 #load public holidays (via spiketime API)
 berlin_holidays <- read.csv("https://www.spiketime.de/feiertagapi/feiertage/csv/2015/2019", sep = ";") %>% 
