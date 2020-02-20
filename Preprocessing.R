@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel)
+pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel, plotly)
 
 # Read in XLSX file (only counts)-------------------------------------------------------
 path <-  "Gesamtdatei_Stundenwerte_2012-2019.xlsx"
@@ -131,6 +131,27 @@ combined_raw <- combined_raw %>%
 skimr::skim(combined_raw) #--> one missing for jannowitz_n
 DataExplorer::plot_missing(combined_raw)
 DataExplorer::plot_histogram(combined_raw)
+
+#too hot?
+ggplotly(
+combined_raw %>%
+  group_by(day = date(date), temperature = round(pmax(temperature))) %>% 
+  summarise(n_day = sum(jannowitz_n)) %>% 
+  ungroup() %>% 
+  group_by(temperature) %>% 
+  summarise(avg_day = mean(n_day)) %>% 
+  ggplot(aes(y=avg_day, x=temperature, fill = temperature, text=paste('Maximal temperature: ', temperature, '°C',
+                                                                      '<br>Average daily cyclists:', round(avg_day))))+
+  rcartocolor::scale_fill_carto_c(palette = "SunsetDark", direction = -1)+
+  geom_col()+
+  theme_minimal(), tooltip = "text"))
+
+
+  labs(title = "Average count of cyclists at Jannowitzbrücke, Berlin (01.04.2015-31.12.2019)",
+       x = "Hour",
+       y = "Average Count of Cyclists",
+       fill = "Public Holiday?")+
+  scale_y_continuous(labels = comma)
 
 #holiday vs no holiday
 combined_raw %>%
