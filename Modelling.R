@@ -15,9 +15,9 @@ test <- combined_no_na %>%
 
 train_folds <- rolling_origin(train,
                               initial = 24*365*3,
-                              assess = 24*7,
+                              assess = 24*7*30,
                               cumulative = F,
-                              skip = 24*7*9)
+                              skip = 24*7*6)
 
 try_folds <- rolling_origin(test,
                               initial = 24*21,
@@ -73,6 +73,8 @@ initial_lm %>%
   collect_metrics(summarize = T)
 
 
+
+
 # MARS --------------------------------------------------------------------
 #setup recipe with normalization of numerical variables
 jannowitz_rec_mars <- recipe(jannowitz_n ~ ., data = train) %>%
@@ -119,7 +121,36 @@ initial_mars %>%
 initial_mars %>% 
   show_best(metric = "rmse", maximize = FALSE)
 
-saveRDS(initial_mars, file = "mars.rds")
+saveRDS(initial_mars, file = "initial_mars.rds")
+
+# KNN ---------------------------------------------------------------------
+#knn model - baseline
+knn_mod <- nearest_neighbor(mode = "regression", neighbors = tune(), weight_func = tune()) %>% 
+  set_engine("kknn")
+
+#define workflow
+knn_wflow <- workflow() %>%
+  add_recipe(jannowitz_rec_lm) %>%
+  add_model(knn_mod)
+
+#create parameter grid for knn
+knn_grid <-  grid_max_entropy(neighbors(range = c(1,20)),
+                              weight_func(),
+                            size = 20)
+
+#run model with resampling
+set.seed(456321)
+initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = )
+
+#show performance across resamples
+initial_lm %>% 
+  collect_metrics(summarize = F)
+#show summarized performance across resamples
+initial_lm %>% 
+  collect_metrics(summarize = T)
+
+saveRDS(initial_knn, file = "initial_knn.rds")
+
 # random forest -----------------------------------------------------------
 
 #setup recipe with normalization of numerical variables
@@ -152,52 +183,24 @@ autoplot(initial_rf)
 initial_rf %>% 
   collect_metrics(summarize = F)
 
-saveRDS(initial_rf, file = "rf.rds")
-# xgboost -----------------------------------------------------------------
+saveRDS(initial_rf, file = "initial_rf.rds")
 
-#setup recipe with normalization of numerical variables
-jannowitz_rec_xgb <- recipe(jannowitz_n ~ ., data = train) %>%
-  step_rm(date) %>% 
-  step_num2factor(weekday, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) %>%
-  step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
-  step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
-  step_num2factor(week, levels = as.character(1:53)) %>%
-  step_dummy(all_nominal(), one_hot = T) %>% 
-  prep()
+rf_low_rmse <- select_best(initial_rf, metric = "rmse", maximize = FALSE)
+rf_low_rmse
+rf_final_wflow <- finalize_workflow(rf_wflow, rf_low_rmse)
+rf_fitted <- fit(rf_final_wflow, data = train)
 
-bake(jannowitz_rec_xgb, train) #bake recipe to see if it works
-#xgboost
-xgb_mod <- boost_tree(mode = "regression",
-                      trees = tune(),
-                      min_n = tune(),
-                      tree_depth = tune(), 
-                      learn_rate = tune(),
-                      loss_reduction = tune()) %>% 
-  set_engine("xgboost")
-
-xgb_wflow <- workflow() %>%
-  add_recipe(jannowitz_rec_xgb) %>%
-  add_model(xgb_mod)
-
-set.seed(12345)
-xgb_grid = grid_max_entropy(trees(range = c(1,1500)),
-                 min_n(),
-                 tree_depth(),
-                 learn_rate(),
-                 loss_reduction(),
-                 size = 20)
-
-initial_xgb <- tune_grid(xgb_wflow, resamples = train_folds, grid = xgb_grid, control = cntrl)
-
-#show best
-initial_xgb %>% 
-  show_best(metric = "rmse", maximize = FALSE)
-
-autoplot(initial_xgb)
-
-
-saveRDS(initial_xgb, file = "xgb.rds")
-
-
-
-
+rf_test <- rf_fitted %>% 
+  predict(new_data = test) %>% 
+  mutate(truth = test$jannowitz_n,
+         week = as.factor(isoweek(test$date)),
+         day = date(test$date),
+         hour = hour(test$date))
+ggplotly(
+rf_test %>% 
+  ggplot(aes(x=truth, y=.pred, color = week,
+             text = paste('Truth ', truth,
+                          '<br>Prediction: ', round(.pred),
+                          '<br>Date: ', as.Date(day), " ", hour, ":00")))+
+  geom_point()+
+    labs(title = paste("Random Forest on test set (01-12-2019 to 31-12-2019), RMSE: ", round(rmse(data= rf_test, truth = truth, estimate = .pred)[3], 2))), tooltip = c("text"))

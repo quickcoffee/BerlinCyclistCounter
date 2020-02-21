@@ -102,7 +102,7 @@ combined_raw <- combined_raw %>%
   mutate(is_holiday = ifelse(as.Date(date) %in% as.Date(berlin_holidays$date), 1, 0), #holiday dummy variable
          tomorrow_is_holiday = ifelse((as.Date(date)+1) %in% as.Date(berlin_holidays$date), 1, 0),
          weekday = wday(date, week_start = 1), #weekday
-         week = week(date), #week no
+         week = isoweek(date), #week no
          is_brueckentag = ifelse(((as.Date(date)-1) %in% as.Date(berlin_holidays$date) & weekday == 5 & (as.Date(date) %not_in% as.Date(berlin_holidays$date))) | #create "brückentag" (Monday/Friday before a holiday) dummy variable
                                   ((as.Date(date)+1) %in% as.Date(berlin_holidays$date) & weekday == 1 & (as.Date(date) %not_in% as.Date(berlin_holidays$date))),
                                  1, 0),
@@ -192,19 +192,21 @@ combined_raw %>%
   scale_y_continuous(labels = comma)
 
 #heatmap weekday/hour
+breaks <- c(50, 150, 400, 1000)
+
 combined_raw %>%
   mutate(weekday_lable = wday(x=date, label = T, abbr = F, week_start = 1)) %>% 
   group_by(weekday_lable, hour) %>%
   summarise(avg_n = mean(jannowitz_n)) %>%
   ggplot(aes(x=hour, y=weekday_lable))+
   geom_tile(aes(fill=avg_n),colour = "white")+
-  rcartocolor::scale_fill_carto_c(palette = "SunsetDark", direction = -1)+
   theme_bw() +
   theme_minimal()+
   labs(title = "Average count of cyclists at Jannowitzbrücke, Berlin (01.04.2015-31.12.2019)",
        x = "Hour",
        y = "Weekday",
-       fill = "Average Count")
+       fill = "Average Count")+
+  rcartocolor::scale_fill_carto_c(palette = "SunsetDark", direction = -1)
 
 #correlation plot
 cor(combined_raw %>% select(-date), use = "complete.obs") %>% 
