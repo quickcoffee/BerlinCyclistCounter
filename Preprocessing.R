@@ -66,7 +66,7 @@ gganimate::animate(p_animated_all_conts, end_pause = 20)
 load_format_weather <- function(path, value){
   weather_df <- read_csv(path) %>% 
     select(date = Zeitstempel, Wert) %>% 
-    rename_(.dots = setNames("Wert", value))
+    dplyr::rename_(.dots = setNames("Wert", value))
   weather_df$date <- as.POSIXct(strptime(weather_df$date, "%Y%m%d%H%M%OS"))
   return(weather_df)
 }

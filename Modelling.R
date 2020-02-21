@@ -53,8 +53,8 @@ jannowitz_rec_lm <- recipe(jannowitz_n ~ ., data = train) %>%
 bake(jannowitz_rec_lm, train) #bake recipe to see if it works
 
 #lm model - baseline
-lm_mod <- linear_reg(mode = "regression") %>% 
-  set_engine("lm")
+lm_mod <- linear_reg(mode = "regression", penalty = tune(), mixture = tune()) %>% 
+  set_engine("glmnet")
 
 #define workflow
 lm_wflow <- workflow() %>%
@@ -63,7 +63,7 @@ lm_wflow <- workflow() %>%
 
 #run model with resampling
 set.seed(456321)
-initial_lm <- fit_resamples(lm_wflow, resamples = train_folds, control = cntrl)
+initial_lm <- tune_grid(lm_wflow, resamples = train_folds, control = cntrl, grid = 20)
 
 #show performance across resamples
 initial_lm %>% 
@@ -71,6 +71,9 @@ initial_lm %>%
 #show summarized performance across resamples
 initial_lm %>% 
   collect_metrics(summarize = T)
+
+initial_lm %>% 
+  show_best(metric = "rmse", maximize = F)
 
 
 
@@ -143,10 +146,10 @@ set.seed(456321)
 initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = )
 
 #show performance across resamples
-initial_lm %>% 
+initial_knn %>% 
   collect_metrics(summarize = F)
 #show summarized performance across resamples
-initial_lm %>% 
+initial_knn %>% 
   collect_metrics(summarize = T)
 
 saveRDS(initial_knn, file = "initial_knn.rds")
