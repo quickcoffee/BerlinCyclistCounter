@@ -273,6 +273,8 @@ plot_residuals <- function(model, test_tibble=test_performace){
       theme_light(),
     tooltip = c("text"))
 }
+
+
 plot_residuals(lm) #zero values and not agreat perforamce in general
 plot_residuals(mars) # better performance but not great
 plot_residuals(knn) # good RMSE but predictions seem very noisy
