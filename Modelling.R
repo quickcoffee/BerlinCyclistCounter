@@ -1,5 +1,5 @@
 pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel)
-load(file = "after_preprocessing.RData")
+load(file = "data/after_preprocessing.RData")
 
 # splitting the data ------------------------------------------------------
 #omit observations with NAs (mostly missing weather data)

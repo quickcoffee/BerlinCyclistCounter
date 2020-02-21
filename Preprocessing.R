@@ -1,7 +1,7 @@
 pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel, plotly)
 
 # Read in XLSX file (only counts)-------------------------------------------------------
-path <-  "Gesamtdatei_Stundenwerte_2012-2019.xlsx"
+path <-  "data/Gesamtdatei_Stundenwerte_2012-2019.xlsx"
 sheetnames <- excel_sheets(path)[7:11]
 sheets_list <- lapply(excel_sheets(path)[7:11], read_excel, path = path, guess_max = 8000)
 
@@ -72,16 +72,16 @@ load_format_weather <- function(path, value){
 }
 
 #wind
-weather_wind <- load_format_weather("weather/data_FF_MN008.csv", "wind_speed")
+weather_wind <- load_format_weather("data/weather/data_FF_MN008.csv", "wind_speed")
 #clouds
-weather_clouds <- load_format_weather("weather/data_N_MN008.csv", "cloud_coverage") %>% 
+weather_clouds <- load_format_weather("data/weather/data_N_MN008.csv", "cloud_coverage") %>% 
   mutate(cloud_coverage = ifelse(cloud_coverage == -1, NA, cloud_coverage))
 #precipitation
-weather_precipitation <- load_format_weather("weather/data_R1_MN008.csv", "precipitation")
+weather_precipitation <- load_format_weather("data/weather/data_R1_MN008.csv", "precipitation")
 #humidity
-weather_humidity <- load_format_weather("weather/data_RF_TU_MN009.csv", "humidity")
+weather_humidity <- load_format_weather("data/weather/data_RF_TU_MN009.csv", "humidity")
 #temperature
-weather_temperature <- load_format_weather("weather/data_TT_TU_MN009.csv", "temperature")
+weather_temperature <- load_format_weather("data/weather/data_TT_TU_MN009.csv", "temperature")
 
 #combine everything
 combined_raw <- bike_count_raw %>%
