@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel)
+pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel, kernlab)
 load(file = "data/after_preprocessing.RData")
 
 # splitting the data ------------------------------------------------------
@@ -78,8 +78,8 @@ lm_fitted <- initial_lm %>%
   finalize_workflow(x = lm_wflow) %>% 
   fit(data=train)
 
-# KNN ---------------------------------------------------------------------
-#knn model - baseline
+# SVM ---------------------------------------------------------------------
+#svm model
 svm_mod <- svm_poly(mode = "regression",
                     cost = tune(),
                     degree = tune(),
@@ -101,6 +101,9 @@ svm_grid <-  grid_max_entropy(cost(),
 
 #run model with resampling
 set.seed(456321)
+library(doParallel)
+cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
+registerDoParallel(cl)
 initial_svm <- tune_grid(svm_wflow, resamples = train_folds, control = cntrl, grid = svm_grid)
 
 #show performance across resamples
@@ -142,7 +145,7 @@ rf_wflow <- workflow() %>%
 
 
 set.seed(456321)
-initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 20, control = cntrl)
+initial_rf <- tune_grid(rf_wflow, resamples = train_folds, grid = 25, control = cntrl)
 #show best
 initial_rf %>% 
   show_best(metric = "rmse", maximize = FALSE)
@@ -158,22 +161,6 @@ rf_fitted <- initial_rf %>%
   select_best(metric = "rmse", maximize = FALSE) %>% 
   finalize_workflow(x = rf_wflow) %>% 
   fit(data=train)
-
-rf_test <- rf_fitted %>% 
-  predict(new_data = test) %>% 
-  mutate(truth = test$jannowitz_n,
-         week = as.factor(isoweek(test$date)),
-         day = date(test$date),
-         hour = hour(test$date))
-ggplotly(
-rf_test %>% 
-  ggplot(aes(x=truth, y=.pred, color = week,
-             text = paste('Truth ', truth,
-                          '<br>Prediction: ', round(.pred),
-                          '<br>Date: ', as.Date(day), " ", hour, ":00")))+
-  geom_point()+
-    labs(title = paste("Random Forest on test set (02-12-2019 to 31-12-2019), RMSE: ", round(rmse(data= rf_test, truth = truth, estimate = .pred)[3], 2))), tooltip = c("text"))
-
 
 
 
