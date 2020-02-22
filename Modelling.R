@@ -78,61 +78,6 @@ lm_fitted <- initial_lm %>%
   finalize_workflow(x = lm_wflow) %>% 
   fit(data=train)
 
-# MARS --------------------------------------------------------------------
-#setup recipe with normalization of numerical variables
-jannowitz_rec_mars <- recipe(jannowitz_n ~ ., data = train) %>%
-  step_rm(date) %>% 
-  step_normalize(starts_with("lag")) %>% 
-  step_pca(starts_with("lag"), num_comp = 1) %>%
-  step_num2factor(weekday, levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")) %>%
-  step_num2factor(hour, levels = as.character(0:23), transform = function(x) x+1) %>% 
-  step_num2factor(month, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) %>%
-  step_num2factor(week, levels = as.character(1:53)) %>% 
-  step_dummy(all_nominal(), one_hot = TRUE) %>%
-  step_normalize(all_numeric(), -all_outcomes()) %>%
-  prep()
-
-bake(jannowitz_rec_mars, train) #bake recipe to see if it works
-
-
-#mars model
-mars_mod <- mars(mode = "regression", num_terms = tune(), prod_degree = tune()) %>% 
-  set_engine("earth")
-
-
-#define workflow
-mars_wflow <- workflow() %>%
-  add_recipe(jannowitz_rec_mars) %>%
-  add_model(mars_mod)
-
-#run model with resampling
-set.seed(456321)
-library(doParallel)
-cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
-registerDoParallel(cl)
-
-initial_mars <- tune_grid(mars_wflow, resamples = train_folds, control = cntrl, grid = 20)
-
-#show performance across resamples
-initial_mars %>% 
-  collect_metrics(summarize = F)
-#show summarized performance across resamples
-initial_mars %>% 
-  collect_metrics(summarize = T)
-
-#show best
-initial_mars %>% 
-  show_best(metric = "rmse", maximize = FALSE)
-
-autoplot(initial_mars)
-
-saveRDS(initial_mars, file = "model_backup/initial_mars.rds")
-
-mars_fitted <- initial_mars %>% 
-  select_best(metric = "rmse", maximize = FALSE) %>% 
-  finalize_workflow(x = mars_wflow) %>% 
-  fit(data=train)
-
 # KNN ---------------------------------------------------------------------
 #knn model - baseline
 svm_mod <- svm_poly(mode = "regression",
@@ -235,7 +180,6 @@ rf_test %>%
 # evaluation --------------------------------------------------------------
 
 rmse_best_models <- rbind(show_best(initial_lm, metric = "rmse", maximize = F, n = 1) %>% select(mean) %>% mutate(model = "lm"),
-      show_best(initial_mars, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "MARS"),
       show_best(initial_svm, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "SVM"),
       show_best(initial_rf, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "rF"))
 rmse_best_models %>% 
@@ -276,7 +220,6 @@ plot_residuals <- function(model, test_tibble=test_performace){
 
 
 plot_residuals(lm) #zero values and not agreat perforamce in general
-plot_residuals(mars) # better performance but not great
-plot_residuals(svm) # good RMSE but predictions seem very noisy
+plot_residuals(svm) #
 plot_residuals(rf) # very good predictions, but outliers in week 52/1
 
