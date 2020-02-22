@@ -14,16 +14,10 @@ test <- combined_no_na %>%
   filter(as.Date(date) > split_date)
 
 train_folds <- rolling_origin(train,
-                              initial = 24*365*3,
-                              assess = 24*7*30,
-                              cumulative = F,
-                              skip = 24*7*6)
-
-try_folds <- rolling_origin(test,
-                              initial = 24*21,
-                              assess = 24*1,
-                              cumulative = F,
-                              skip = 24*7)
+                                  initial = 24*365*3,
+                                  assess = 24*7*30,
+                                  cumulative = F,
+                                  skip = 24*7*5)
 
 
 #number of folds
@@ -141,38 +135,44 @@ mars_fitted <- initial_mars %>%
 
 # KNN ---------------------------------------------------------------------
 #knn model - baseline
-knn_mod <- nearest_neighbor(mode = "regression", neighbors = tune(), weight_func = tune()) %>% 
-  set_engine("kknn")
+svm_mod <- svm_poly(mode = "regression",
+                    cost = tune(),
+                    degree = tune(),
+                    scale_factor = tune(),
+                    margin = tune()) %>% 
+  set_engine("kernlab")
 
 #define workflow
-knn_wflow <- workflow() %>%
+svm_wflow <- workflow() %>%
   add_recipe(jannowitz_rec_lm) %>%
-  add_model(knn_mod)
+  add_model(svm_mod)
 
 #create parameter grid for knn
-knn_grid <-  grid_max_entropy(neighbors(range = c(1,20)),
-                              weight_func(),
+svm_grid <-  grid_max_entropy(cost(),
+                              degree(),
+                              scale_factor(),
+                              margin(),
                             size = 20)
 
 #run model with resampling
 set.seed(456321)
-initial_knn <- tune_grid(knn_wflow, resamples = train_folds, control = cntrl, grid = knn_grid)
+initial_svm <- tune_grid(svm_wflow, resamples = train_folds, control = cntrl, grid = svm_grid)
 
 #show performance across resamples
-initial_knn %>% 
+initial_svm %>% 
   collect_metrics(summarize = F) %>% 
   filter(.metric == "rmse")
 #show summarized performance across resamples
-initial_knn %>% 
+initial_svm %>% 
   collect_metrics(summarize = T)
 
-autoplot(initial_knn)
+autoplot(initial_svm)
 
-saveRDS(initial_knn, file = "model_backup/initial_knn.rds")
+saveRDS(initial_svm, file = "model_backup/initial_svm.rds")
 
-knn_fitted <- initial_knn %>% 
+svm_fitted <- initial_svm %>% 
   select_best(metric = "rmse", maximize = FALSE) %>% 
-  finalize_workflow(x = knn_wflow) %>% 
+  finalize_workflow(x = svm_wflow) %>% 
   fit(data=train)
 
 # random forest -----------------------------------------------------------
@@ -236,7 +236,7 @@ rf_test %>%
 
 rmse_best_models <- rbind(show_best(initial_lm, metric = "rmse", maximize = F, n = 1) %>% select(mean) %>% mutate(model = "lm"),
       show_best(initial_mars, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "MARS"),
-      show_best(initial_knn, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "KNN"),
+      show_best(initial_svm, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "SVM"),
       show_best(initial_rf, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "rF"))
 rmse_best_models %>% 
   ggplot(aes(x=model, y=mean, fill=model))+
@@ -248,7 +248,7 @@ rmse_best_models %>%
 test_performace <- tibble(truth = test$jannowitz_n) %>% 
   mutate(lm = predict(lm_fitted, new_data = test)$.pred,
          mars = predict(mars_fitted, new_data = test)$.pred,
-         knn = predict(knn_fitted, new_data = test)$.pred,
+         svm = predict(svm_fitted, new_data = test)$.pred,
          rf = predict(rf_fitted, new_data = test)$.pred,
          week = as.factor(isoweek(test$date)),
          day = date(test$date),
@@ -277,6 +277,6 @@ plot_residuals <- function(model, test_tibble=test_performace){
 
 plot_residuals(lm) #zero values and not agreat perforamce in general
 plot_residuals(mars) # better performance but not great
-plot_residuals(knn) # good RMSE but predictions seem very noisy
+plot_residuals(svm) # good RMSE but predictions seem very noisy
 plot_residuals(rf) # very good predictions, but outliers in week 52/1
 
