@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel, kernlab)
+pacman::p_load(tidyverse, tidymodels, lubridate, readxl, DataExplorer, timeDate, tune, workflows, rcartocolor, ggmap, gganimate, ggrepel, kernlab, plotly)
 load(file = "data/after_preprocessing.RData")
 
 # splitting the data ------------------------------------------------------
@@ -150,6 +150,7 @@ plot_residuals <- function(model, test_tibble=test_performace){
                               '<br>Prediction: ', round(!!mod_var),
                               '<br>Date: ', as.Date(day), " ", hour, ":00")))+
       geom_point()+
+      geom_abline(slope=1, intercept=0)+
       labs(title = paste(mod_str,"on test set (01-11-2019 to 31-12-2019), RMSE:",
                          round(rmse(data= test_tibble, truth = truth,
                                     estimate = !!mod_var)[3], 2)),
@@ -161,6 +162,6 @@ plot_residuals <- function(model, test_tibble=test_performace){
 }
 
 
-plot_residuals(lm) #zero values and not agreat perforamce in general
-plot_residuals(rf) # very good predictions, but outliers in week 52/1
+plot_residuals(lm) #zero values and not a great perforamce in general
+plot_residuals(rf) # good predictions, but outliers in week 52/1
 
