@@ -7,17 +7,17 @@ combined_no_na <- combined_raw %>%
   na.omit()
 print(paste("Deleted rows containing at least one NA:", nrow(combined_raw) - nrow(combined_no_na)))
 
-split_date <- "2019-12-01"
+split_date <- "2019-10-31"
 train <- combined_no_na %>% 
   filter(as.Date(date) < split_date)
 test <- combined_no_na %>% 
   filter(as.Date(date) > split_date)
 
 train_folds <- rolling_origin(train,
-                                  initial = 24*365*3,
-                                  assess = 24*7*30,
+                                  initial = 24*365*2,
+                                  assess = 24*7*8,
                                   cumulative = F,
-                                  skip = 24*7*5)
+                                  skip = 24*7*12)
 
 
 #number of folds
@@ -80,11 +80,10 @@ lm_fitted <- initial_lm %>%
 
 # SVM ---------------------------------------------------------------------
 #svm model
-svm_mod <- svm_poly(mode = "regression",
-                    cost = tune(),
-                    degree = tune(),
-                    scale_factor = tune(),
-                    margin = tune()) %>% 
+svm_mod <- svm_rbf(mode = "regression",
+                   cost = tune(),
+                   rbf_sigma = tune(),
+                   margin = tune()) %>% 
   set_engine("kernlab")
 
 #define workflow
@@ -94,10 +93,9 @@ svm_wflow <- workflow() %>%
 
 #create parameter grid for knn
 svm_grid <-  grid_max_entropy(cost(),
-                              degree(),
-                              scale_factor(),
+                              rbf_sigma(),
                               margin(),
-                            size = 20)
+                            size = 15)
 
 #run model with resampling
 set.seed(456321)
