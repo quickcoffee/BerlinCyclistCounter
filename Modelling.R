@@ -17,7 +17,7 @@ train_folds <- rolling_origin(train,
                                   initial = 24*365*2,
                                   assess = 24*7*8,
                                   cumulative = F,
-                                  skip = 24*7*12)
+                                  skip = 24*7*14)
 
 
 #number of folds
@@ -57,6 +57,9 @@ lm_wflow <- workflow() %>%
 
 #run model with resampling
 set.seed(456321)
+library(doParallel)
+cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
+registerDoParallel(cl)
 initial_lm <- tune_grid(lm_wflow, resamples = train_folds, control = cntrl, grid = 20)
 
 #show performance across resamples
@@ -76,49 +79,6 @@ saveRDS(initial_lm, file = "model_backup/initial_lm.rds")
 lm_fitted <- initial_lm %>% 
   select_best(metric = "rmse", maximize = FALSE) %>% 
   finalize_workflow(x = lm_wflow) %>% 
-  fit(data=train)
-
-# SVM ---------------------------------------------------------------------
-#svm model
-svm_mod <- svm_rbf(mode = "regression",
-                   cost = tune(),
-                   rbf_sigma = tune(),
-                   margin = tune()) %>% 
-  set_engine("kernlab")
-
-#define workflow
-svm_wflow <- workflow() %>%
-  add_recipe(jannowitz_rec_lm) %>%
-  add_model(svm_mod)
-
-#create parameter grid for knn
-svm_grid <-  grid_max_entropy(cost(),
-                              rbf_sigma(),
-                              margin(),
-                            size = 15)
-
-#run model with resampling
-set.seed(456321)
-library(doParallel)
-cl <- makePSOCKcluster(parallel::detectCores(logical = T)-1)
-registerDoParallel(cl)
-initial_svm <- tune_grid(svm_wflow, resamples = train_folds, control = cntrl, grid = svm_grid)
-
-#show performance across resamples
-initial_svm %>% 
-  collect_metrics(summarize = F) %>% 
-  filter(.metric == "rmse")
-#show summarized performance across resamples
-initial_svm %>% 
-  collect_metrics(summarize = T)
-
-autoplot(initial_svm)
-
-saveRDS(initial_svm, file = "model_backup/initial_svm.rds")
-
-svm_fitted <- initial_svm %>% 
-  select_best(metric = "rmse", maximize = FALSE) %>% 
-  finalize_workflow(x = svm_wflow) %>% 
   fit(data=train)
 
 # random forest -----------------------------------------------------------
@@ -165,7 +125,6 @@ rf_fitted <- initial_rf %>%
 # evaluation --------------------------------------------------------------
 
 rmse_best_models <- rbind(show_best(initial_lm, metric = "rmse", maximize = F, n = 1) %>% select(mean) %>% mutate(model = "lm"),
-      show_best(initial_svm, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "SVM"),
       show_best(initial_rf, metric = "rmse", maximize = F, n = 1)%>% select(mean) %>% mutate(model = "rF"))
 rmse_best_models %>% 
   ggplot(aes(x=model, y=mean, fill=model))+
@@ -176,8 +135,6 @@ rmse_best_models %>%
 
 test_performace <- tibble(truth = test$jannowitz_n) %>% 
   mutate(lm = predict(lm_fitted, new_data = test)$.pred,
-         mars = predict(mars_fitted, new_data = test)$.pred,
-         svm = predict(svm_fitted, new_data = test)$.pred,
          rf = predict(rf_fitted, new_data = test)$.pred,
          week = as.factor(isoweek(test$date)),
          day = date(test$date),
@@ -193,7 +150,7 @@ plot_residuals <- function(model, test_tibble=test_performace){
                               '<br>Prediction: ', round(!!mod_var),
                               '<br>Date: ', as.Date(day), " ", hour, ":00")))+
       geom_point()+
-      labs(title = paste(mod_str,"on test set (02-12-2019 to 31-12-2019), RMSE:",
+      labs(title = paste(mod_str,"on test set (01-11-2019 to 31-12-2019), RMSE:",
                          round(rmse(data= test_tibble, truth = truth,
                                     estimate = !!mod_var)[3], 2)),
            y="Predictions",
@@ -205,6 +162,5 @@ plot_residuals <- function(model, test_tibble=test_performace){
 
 
 plot_residuals(lm) #zero values and not agreat perforamce in general
-plot_residuals(svm) #
 plot_residuals(rf) # very good predictions, but outliers in week 52/1
 
