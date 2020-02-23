@@ -14,10 +14,10 @@ test <- combined_no_na %>%
   filter(as.Date(date) > split_date)
 
 train_folds <- rolling_origin(train,
-                                  initial = 24*365*2,
-                                  assess = 24*7*8,
+                                  initial = 24*365*2, #two years as a moving window
+                                  assess = 24*7*8, #8 weeks of assessment
                                   cumulative = F,
-                                  skip = 24*7*14)
+                                  skip = 24*7*14) #moving the window by 14 weeks
 
 
 #number of folds
